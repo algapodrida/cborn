@@ -870,6 +870,28 @@ body::after {
         <div class="stat-sp">⚡ ENE: 3</div>
       </div>
     </div>
+    <div class="class-card" onclick="selectClass('necro')">
+      <div class="class-icon">💀</div>
+      <div class="class-name">NIGROMANTE</div>
+      <div class="class-desc">Domina la muerte. Invoca no-muertos y absorbe la vida enemiga.</div>
+      <div class="class-stats">
+        <div class="stat-hp">❤️ HP: 65</div>
+        <div class="stat-atk">⚔️ ATK: 9</div>
+        <div class="stat-def">🛡️ DEF: 2</div>
+        <div class="stat-sp">⚡ ENE: 3</div>
+      </div>
+    </div>
+    <div class="class-card" onclick="selectClass('shaman')">
+      <div class="class-icon">🌿</div>
+      <div class="class-name">CHAMÁN</div>
+      <div class="class-desc">Espíritu salvaje. Buffs naturales, relámpagos y transformaciones.</div>
+      <div class="class-stats">
+        <div class="stat-hp">❤️ HP: 75</div>
+        <div class="stat-atk">⚔️ ATK: 7</div>
+        <div class="stat-def">🛡️ DEF: 3</div>
+        <div class="stat-sp">⚡ ENE: 4</div>
+      </div>
+    </div>
   </div>
   <button class="menu-btn red" onclick="showScreen('title')" style="font-size:0.5rem;padding:8px 16px;margin-top:10px">◀ VOLVER</button>
 </div>
@@ -903,6 +925,7 @@ body::after {
         <div>E = ENEMIGO &nbsp;&nbsp; B = JEFE</div>
         <div>▼ = ESCALERA &nbsp;&nbsp; $ = TESORO</div>
         <div>+ = CURACIÓN &nbsp;&nbsp; S = TIENDA</div>
+        <div style="color:var(--red);margin-top:2px">⚠ Derrota al JEFE para desbloquear la bajada</div>
         <div style="color:var(--cyan);margin-top:2px">WASD / ←→↑↓ para moverse</div>
       </div>
     </div>
@@ -1062,6 +1085,7 @@ const GS = {
   enemyIntent: null,
   combatTurn: 0,
   inCombat: false,
+  bossDefeated: false,   // Tracks if boss of this floor is defeated
 
   // Map
   map: [],
@@ -1114,20 +1138,66 @@ const ALL_CARDS = {
   elixir:     { id:'elixir',  name:'ELIXIR',      icon:'🍶', type:'item', cost:1, effect:'Cura 30 HP + Esc.10',fn:()=>{ healPlayer(30); gainShield(10); } },
   rage:       { id:'rage',    name:'RABIA',       icon:'😡', type:'skill',cost:1, effect:'FZA+3 este turno', fn:()=>addBuff('strength',3) },
   draw:       { id:'draw',    name:'ESTUDIO',     icon:'📖', type:'skill',cost:1, effect:'Roba 3 cartas',     fn:()=>drawCards(3) },
+
+  // WARRIOR EXTRA
+  whirlwind:  { id:'whirlwind',name:'TORBELLINO', icon:'🌀', type:'atk',  cost:2, effect:'Daño 8×2',         fn:(e)=>{ dealDmg(8,e); dealDmg(8,e); } },
+  warCry:     { id:'warCry',   name:'GRITO GUERRA',icon:'📣',type:'skill',cost:1, effect:'FZA+4, Roba 1',    fn:()=>{ addBuff('strength',4); drawCards(1); } },
+  bodySlam:   { id:'bodySlam', name:'EMBESTIDA',  icon:'🪨', type:'atk',  cost:1, effect:'Daño = tu escudo', fn:(e)=>dealDmg(Math.max(3,GS.shield),e) },
+  rampart:    { id:'rampart',  name:'BALUARTE',   icon:'🏰', type:'def',  cost:2, effect:'Escudo 20',        fn:()=>gainShield(20) },
+
+  // ROGUE EXTRA
+  flurry:     { id:'flurry',  name:'RÁFAGA',      icon:'🌪️', type:'atk',  cost:1, effect:'Daño 3×3',         fn:(e)=>{ dealDmg(3,e); dealDmg(3,e); dealDmg(3,e); } },
+  caltrop:    { id:'caltrop', name:'TRAMPA',       icon:'🪤', type:'skill',cost:1, effect:'Envenena x5 + Esc.2',fn:(e)=>{ addEnemyBuff('poison',5); gainShield(2); } },
+  cheapShot:  { id:'cheapShot',name:'GOLPE BAJO',  icon:'👊', type:'atk',  cost:0, effect:'Daño 6 + Debil.1', fn:(e)=>{ dealDmg(6,e); addEnemyBuff('weak',1); } },
+  evasion:    { id:'evasion', name:'EVASIÓN',      icon:'💃', type:'def',  cost:0, effect:'Esquivar + Esc.2', fn:()=>{ addBuff('dodge',1); gainShield(2); } },
+
+  // MAGE EXTRA
+  chainLight: { id:'chainLight',name:'RAYO CADENA',icon:'⚡', type:'atk',  cost:2, effect:'Daño 10 + Debil.3',fn:(e)=>{ dealDmg(10,e); addEnemyBuff('weak',3); } },
+  timeStop:   { id:'timeStop', name:'PARAR TIEMPO',icon:'⏰', type:'skill',cost:3, effect:'Roba 4 cartas + ENE+2',fn:()=>{ drawCards(4); GS.energy=Math.min(GS.maxEnergy,GS.energy+2); } },
+  iceWall:    { id:'iceWall',  name:'MURO HIELO',  icon:'🧊', type:'def',  cost:2, effect:'Escudo 15 + Debil.2',fn:(e)=>{ gainShield(15); addEnemyBuff('weak',2); } },
+  flameBurst: { id:'flameBurst',name:'EXPLOSIÓN',  icon:'💥', type:'atk',  cost:2, effect:'Daño 20 + Enven.2', fn:(e)=>{ dealDmg(20,e); addEnemyBuff('poison',2); } },
+
+  // PALADIN EXTRA
+  divineShield:{ id:'divineShield',name:'ESC.DIVINO',icon:'✨',type:'def', cost:2, effect:'Escudo 18',        fn:()=>gainShield(18) },
+  holyNova:   { id:'holyNova', name:'NOVA SAGRADA', icon:'🌟', type:'atk', cost:3, effect:'Daño 15 + Cura 10',fn:(e)=>{ dealDmg(15,e); healPlayer(10); } },
+  penance:    { id:'penance',  name:'PENITENCIA',   icon:'🙏', type:'skill',cost:1, effect:'Cura 20 HP',      fn:()=>healPlayer(20) },
+  judgment:   { id:'judgment', name:'JUICIO',        icon:'⚖️', type:'atk', cost:2, effect:'Daño 10 + si ene debil daño×2',fn:(e)=>{ const bonus=GS.enemyBuffs.weak?10:0; dealDmg(10+bonus,e); } },
+
+  // NECROMANCER
+  soulDrain:  { id:'soulDrain', name:'DRENAR ALMA',  icon:'🌑', type:'atk', cost:1, effect:'Daño 8, Cura 4',  fn:(e)=>{ dealDmg(8,e); healPlayer(4); } },
+  raiseDead:  { id:'raiseDead', name:'REVIVIR',       icon:'💀', type:'skill',cost:2, effect:'FZA+3 + Esc.8', fn:()=>{ addBuff('strength',3); gainShield(8); } },
+  curse:      { id:'curse',     name:'MALDICIÓN',     icon:'🩸', type:'skill',cost:1, effect:'Enven.4 + Debil.2',fn:(e)=>{ addEnemyBuff('poison',4); addEnemyBuff('weak',2); } },
+  boneSpear:  { id:'boneSpear', name:'LANZA HUESO',   icon:'🦴', type:'atk', cost:2, effect:'Daño 18',        fn:(e)=>dealDmg(18,e) },
+  deathCoil:  { id:'deathCoil', name:'ESPIRAL MUERTE',icon:'🌀', type:'atk', cost:1, effect:'Daño 5 + Enven.3',fn:(e)=>{ dealDmg(5,e); addEnemyBuff('poison',3); } },
+  lichForm:   { id:'lichForm',  name:'FORMA LICH',    icon:'👁️', type:'skill',cost:3, effect:'FZA+6 + Roba 2',fn:()=>{ addBuff('strength',6); drawCards(2); } },
+  shadowBolt: { id:'shadowBolt',name:'RAYO SOMBRA',   icon:'🔮', type:'atk', cost:1, effect:'Daño 9',         fn:(e)=>dealDmg(9,e) },
+
+  // SHAMAN
+  thunder:    { id:'thunder',   name:'TRUENO',         icon:'⛈️', type:'atk', cost:2, effect:'Daño 15 + Debil.2',fn:(e)=>{ dealDmg(15,e); addEnemyBuff('weak',2); } },
+  earthShield:{ id:'earthShield',name:'ESC.TIERRA',    icon:'🪨', type:'def', cost:1, effect:'Escudo 10',      fn:()=>gainShield(10) },
+  natureBond: { id:'natureBond',name:'VÍNCULO NAT.',   icon:'🌿', type:'skill',cost:2, effect:'Cura 15 + Esc.8',fn:()=>{ healPlayer(15); gainShield(8); } },
+  spiritWolf: { id:'spiritWolf',name:'LOBO ESPÍRITU',  icon:'🐺', type:'skill',cost:1, effect:'FZA+2 + Roba 2',fn:()=>{ addBuff('strength',2); drawCards(2); } },
+  lightning:  { id:'lightning', name:'RELÁMPAGO',      icon:'⚡', type:'atk', cost:1, effect:'Daño 10',        fn:(e)=>dealDmg(10,e) },
+  totemic:    { id:'totemic',   name:'TÓTEM',          icon:'🗿', type:'skill',cost:2, effect:'Esc.12 + ENE+1',fn:()=>{ gainShield(12); GS.energy=Math.min(GS.maxEnergy,GS.energy+1); } },
+  stormStrike:{ id:'stormStrike',name:'GOLPE TORMENTA',icon:'🌩️',type:'atk', cost:2, effect:'Daño 12 + Enven.2',fn:(e)=>{ dealDmg(12,e); addEnemyBuff('poison',2); } },
 };
 
 const CLASS_DECKS = {
-  warrior: ['strike','strike','strike','strike','defend','defend','bash','ironWave'],
-  rogue:   ['stab','stab','stab','backstab','poison','smoke','shiv','dagger'],
-  mage:    ['fireball','frostbolt','arcane','manaShield','arcane','frostbolt','regen'],
-  paladin: ['holyStrike','holyStrike','bulwark','heal','smite','holyStrike','bulwark'],
+  warrior: ['strike','strike','strike','strike','defend','defend','bash','ironWave','heavyBlow','fortify'],
+  rogue:   ['stab','stab','stab','backstab','poison','smoke','shiv','dagger','evasion','cheapShot'],
+  mage:    ['fireball','frostbolt','arcane','manaShield','arcane','frostbolt','regen','blizzard','chainLight'],
+  paladin: ['holyStrike','holyStrike','bulwark','heal','smite','holyStrike','bulwark','penance','divineShield'],
+  necro:   ['soulDrain','soulDrain','shadowBolt','curse','raiseDead','deathCoil','soulDrain','shadowBolt','boneSpear'],
+  shaman:  ['lightning','lightning','earthShield','thunder','spiritWolf','natureBond','lightning','earthShield','stormStrike'],
 };
 
 const CLASS_CONFIG = {
-  warrior: { name:'GUERRERO', sprite:'⚔️', hp:80, atk:8, def:4, energy:3 },
-  rogue:   { name:'PÍCARO',   sprite:'🗡️', hp:60, atk:6, def:2, energy:4 },
-  mage:    { name:'MAGO',     sprite:'🔮', hp:50, atk:12,def:1, energy:3 },
-  paladin: { name:'PALADÍN',  sprite:'🛡️', hp:100,atk:5, def:8, energy:3 },
+  warrior: { name:'GUERRERO',   sprite:'⚔️',  hp:80,  atk:8,  def:4, energy:3 },
+  rogue:   { name:'PÍCARO',     sprite:'🗡️',  hp:60,  atk:6,  def:2, energy:4 },
+  mage:    { name:'MAGO',       sprite:'🔮',  hp:50,  atk:12, def:1, energy:3 },
+  paladin: { name:'PALADÍN',    sprite:'🛡️',  hp:100, atk:5,  def:8, energy:3 },
+  necro:   { name:'NIGROMANTE', sprite:'💀',  hp:65,  atk:9,  def:2, energy:3 },
+  shaman:  { name:'CHAMÁN',     sprite:'🌿',  hp:75,  atk:7,  def:3, energy:4 },
 };
 
 // ═══════════════════════════════════════
@@ -1143,10 +1213,10 @@ const ENEMIES = {
   vampire:    { name:'VAMPIRO',     sprite:'🧛', hp:45, atk:9, def:2, xp:25, gold:[20,40], ai:'drain' },
   demon:      { name:'DEMONIO',     sprite:'😈', hp:70, atk:14,def:5, xp:35, gold:[25,50], ai:'berserker' },
   lich:       { name:'LICH',        sprite:'🧙‍♂️',hp:60, atk:12,def:3, xp:40, gold:[30,60], ai:'mage' },
-  // BOSSES
-  boss1:      { name:'EL GUARDIÁN', sprite:'🐲', hp:120,atk:15,def:8, xp:100,gold:[80,120],ai:'boss', isBoss:true },
-  boss2:      { name:'SEÑOR OSCURO',sprite:'👑', hp:180,atk:20,def:10,xp:150,gold:[120,180],ai:'boss2',isBoss:true },
-  boss3:      { name:'ARCHIDEMON',  sprite:'🔱', hp:250,atk:25,def:12,xp:200,gold:[150,250],ai:'boss3',isBoss:true },
+  // BOSSES (un poco más fáciles)
+  boss1:      { name:'EL GUARDIÁN', sprite:'🐲', hp:100,atk:12,def:6, xp:100,gold:[80,120],ai:'boss', isBoss:true },
+  boss2:      { name:'SEÑOR OSCURO',sprite:'👑', hp:150,atk:17,def:8, xp:150,gold:[120,180],ai:'boss2',isBoss:true },
+  boss3:      { name:'ARCHIDEMON',  sprite:'🔱', hp:200,atk:20,def:10,xp:200,gold:[150,250],ai:'boss3',isBoss:true },
 };
 
 const FLOOR_ENEMIES = {
@@ -1417,6 +1487,10 @@ function movePlayer(dy, dx) {
       startCombat(ny,nx,true);
       break;
     case TILE.STAIRS:
+      if (!GS.bossDefeated) {
+        addGameLog('🚫 ¡El jefe de esta planta bloquea el descenso! Derrótalo primero.', 'log-dmg');
+        return;
+      }
       nextFloor(ny,nx);
       break;
     case TILE.CHEST:
@@ -1440,15 +1514,18 @@ function movePlayer(dy, dx) {
 function nextFloor(ny,nx) {
   GS.map[GS.py][GS.px]=TILE.FLOOR;
   GS.floor++;
+  GS.bossDefeated = false;
   addGameLog(`▼ Bajáis a la Planta ${GS.floor}...`, 'log-floor');
   if (GS.floor > 3) {
-    // Win condition placeholder — show special win
+    // Win condition
     winGame();
     return;
   }
   generateMap();
   GS.visited = new Set();
-  document.getElementById('floor-indicator').textContent = `PLANTA ${GS.floor} — ${['CRIPTA SUPERIOR','CATACUMBAS','EL ABISMO'][GS.floor-1]||'LAS PROFUNDIDADES'}`;
+  const floorNames=['CRIPTA SUPERIOR','CATACUMBAS','EL ABISMO','LAS PROFUNDIDADES'];
+  document.getElementById('floor-indicator').textContent = `PLANTA ${GS.floor} — ${floorNames[GS.floor-1]||'MÁS ALLÁ'}`;
+  addGameLog(`⚠ ¡Derrota al Jefe para bajar de planta!`, 'log-dmg');
   updateHUD();
 }
 
@@ -1462,21 +1539,42 @@ function openChest(ny,nx) {
   addGameLog(`💰 ¡Cofre! +${gold} oro`, 'log-loot');
 
   // Chance to get a relic
-  if (Math.random()<0.3 && GS.relics.length<4) {
-    const relics=['💍 Anillo de Fuerza (+1 ATK)','🪬 Amuleto de Vida (+15 MAX HP)','🎯 Foco Arcano (+1 ENE/combate)','🦴 Reliquia Maldita (+5 ATK, -10 HP)'];
+  if (Math.random()<0.35 && GS.relics.length<6) {
+    const relics=[
+      '💍 Anillo de Fuerza (+2 ATK)',
+      '🪬 Amuleto de Vida (+20 MAX HP)',
+      '🎯 Foco Arcano (+1 ENE/combate)',
+      '🦴 Reliquia Maldita (+5 ATK, -10 HP)',
+      '🧲 Piedra Imán (+8 DEF)',
+      '🌙 Cristal Lunar (Cura 5 HP por turno)',
+      '🔑 Llave del Caos (+1 ENE MAX)',
+      '👁️ Ojo Omnisciente (+3 ATK, +3 DEF)',
+      '🩸 Corazón Vampírico (Drenar +3 HP por victoria)',
+      '🎴 Mazo Eterno (Roba +1 carta al inicio del combate)',
+      '⚗️ Frasco Alquímico (+15 MAX HP, +2 ATK)',
+      '🌟 Aureola Sagrada (+4 DEF, +10 MAX HP)',
+    ];
     const r=relics[Math.floor(Math.random()*relics.length)];
-    GS.relics.push(r);
-    applyRelic(r);
-    addGameLog(`✨ RELIQUIA: ${r}`, 'log-special');
+    if(!GS.relics.includes(r)) {
+      GS.relics.push(r);
+      applyRelic(r);
+      addGameLog(`✨ RELIQUIA: ${r}`, 'log-special');
+    }
   }
   updateHUD();
   renderSideDeck();
 }
 
 function applyRelic(r) {
-  if(r.includes('Fuerza')) GS.atk++;
-  if(r.includes('Vida')) { GS.maxHp+=15; GS.hp=Math.min(GS.maxHp,GS.hp+15); }
+  if(r.includes('Fuerza')) GS.atk+=2;
+  if(r.includes('Vida')) { GS.maxHp+=20; GS.hp=Math.min(GS.maxHp,GS.hp+20); }
   if(r.includes('Maldita')) { GS.atk+=5; GS.hp=Math.max(1,GS.hp-10); GS.maxHp=Math.max(1,GS.maxHp-10); }
+  if(r.includes('Piedra Imán')) GS.def+=8;
+  if(r.includes('Cristal Lunar')) GS.relicHpRegen=(GS.relicHpRegen||0)+5;
+  if(r.includes('Llave del Caos')) GS.maxEnergy++;
+  if(r.includes('Ojo Omnisciente')) { GS.atk+=3; GS.def+=3; }
+  if(r.includes('Frasco')) { GS.maxHp+=15; GS.hp=Math.min(GS.maxHp,GS.hp+15); GS.atk+=2; }
+  if(r.includes('Aureola')) { GS.def+=4; GS.maxHp+=10; GS.hp=Math.min(GS.maxHp,GS.hp+10); }
   updateRelics();
 }
 
@@ -1727,6 +1825,15 @@ function endPlayerTurn() {
     GS.energy=Math.min(GS.maxEnergy+1, GS.energy+1);
     renderCombat();
   }
+  // Cristal Lunar: Regen HP per turn
+  if(GS.relicHpRegen) {
+    healPlayer(GS.relicHpRegen);
+    addCombatLog(`🌙 Cristal Lunar: +${GS.relicHpRegen} HP`, 'log-heal');
+  }
+  // Mazo Eterno: extra card draw
+  if(GS.relics.some(r=>r.includes('Mazo Eterno'))) {
+    drawCards(1);
+  }
 }
 
 function tickBuffs() {
@@ -1818,9 +1925,33 @@ function endCombat(won) {
     GS.py=e.row; GS.px=e.col;
     GS.map[GS.py][GS.px]=TILE.PLAYER;
 
+    // If boss was defeated, unlock stairs
+    if (e.isBoss) {
+      GS.bossDefeated = true;
+      addGameLog('🔓 ¡El jefe ha caído! Las escaleras se han desbloqueado.', 'log-floor');
+      // Place stairs near boss room if not already there
+      const hasStairs = GS.map.some(row=>row.includes(TILE.STAIRS));
+      if (!hasStairs) {
+        // Find a free floor tile nearby
+        for (let dy=-3; dy<=3; dy++) for (let dx=-3; dx<=3; dx++) {
+          const ty=GS.py+dy, tx=GS.px+dx;
+          if (ty>=0&&ty<GS.mapH&&tx>=0&&tx<GS.mapW&&GS.map[ty][tx]===TILE.FLOOR) {
+            GS.map[ty][tx]=TILE.STAIRS;
+            goto_placed: break;
+          }
+        }
+      }
+    }
+
     // Level up check
     checkLevelUp();
     updateHUD();
+
+    // Corazón Vampírico: heal on kill
+    if(GS.relics.some(r=>r.includes('Vampírico'))) {
+      healPlayer(3);
+      addGameLog('🩸 Corazón Vampírico: +3 HP', 'log-heal');
+    }
 
     // Show reward screen
     showReward();
@@ -1856,9 +1987,11 @@ function checkLevelUp() {
     GS.level++;
     GS.xp-=GS.xpNext;
     GS.xpNext=Math.floor(GS.xpNext*1.5);
-    GS.maxHp+=10; GS.hp=Math.min(GS.maxHp,GS.hp+10);
+    GS.maxHp+=12; GS.hp=Math.min(GS.maxHp,GS.hp+12);
     GS.atk+=1;
-    addGameLog(`🌟 ¡NIVEL ${GS.level}! +10 MaxHP, +1 ATK`, 'log-special');
+    if(GS.level%3===0) GS.def+=1;
+    if(GS.level%5===0) { GS.maxEnergy++; addGameLog(`⚡ Nivel ${GS.level}: ¡+1 Energía máxima!`, 'log-special'); }
+    addGameLog(`🌟 ¡NIVEL ${GS.level}! +12 MaxHP, +1 ATK${GS.level%3===0?', +1 DEF':''}`, 'log-special');
   }
 }
 
@@ -1904,21 +2037,38 @@ function skipReward() {
 function openShop() {
   document.getElementById('shop-gold').textContent=GS.gold;
   const items=[
-    { icon:'💊', name:'POCIÓN MAYOR',   desc:'Cura 30 HP ahora',     price:30, fn:()=>{ healPlayer(30); addGameLog('💊 Poción usada: +30 HP','log-heal'); } },
-    { icon:'⚔️', name:'ARMA AFILADA',   desc:'+2 ATK permanente',    price:50, fn:()=>{ GS.atk+=2; addGameLog('⚔️ Arma mejorada: +2 ATK','log-special'); } },
-    { icon:'🛡️', name:'ARMADURA',       desc:'+3 DEF permanente',    price:50, fn:()=>{ GS.def+=3; addGameLog('🛡 Armadura comprada: +3 DEF','log-special'); } },
-    { icon:'❤️', name:'CORAZÓN RÚNICO', desc:'+20 MAX HP',          price:60, fn:()=>{ GS.maxHp+=20; GS.hp=Math.min(GS.maxHp,GS.hp+20); addGameLog('❤️ +20 Max HP','log-heal'); } },
-    { icon:'⚡', name:'CRISTAL ARCANO', desc:'+1 ENERGÍA MAX',       price:80, fn:()=>{ GS.maxEnergy++; addGameLog('⚡ +1 Energía máxima','log-special'); } },
-    { icon:'📖', name:'TOMO MISTERIOSO',desc:'Añade carta aleatoria al mazo',price:40, fn:()=>{
+    { icon:'💊', name:'POCIÓN MAYOR',    desc:'Cura 30 HP ahora',           price:30, fn:()=>{ healPlayer(30); addGameLog('💊 Poción usada: +30 HP','log-heal'); } },
+    { icon:'🧪', name:'GRAN ELIXIR',     desc:'Cura 50 HP ahora',           price:55, fn:()=>{ healPlayer(50); addGameLog('🧪 Gran Elixir: +50 HP','log-heal'); } },
+    { icon:'⚔️', name:'ARMA AFILADA',    desc:'+2 ATK permanente',          price:50, fn:()=>{ GS.atk+=2; addGameLog('⚔️ Arma mejorada: +2 ATK','log-special'); } },
+    { icon:'🗡️', name:'HOJA RÚNICA',     desc:'+4 ATK permanente',          price:90, fn:()=>{ GS.atk+=4; addGameLog('🗡️ Hoja Rúnica: +4 ATK','log-special'); } },
+    { icon:'🛡️', name:'ARMADURA',        desc:'+3 DEF permanente',          price:50, fn:()=>{ GS.def+=3; addGameLog('🛡 Armadura comprada: +3 DEF','log-special'); } },
+    { icon:'🏰', name:'COTA MALLA',      desc:'+5 DEF permanente',          price:85, fn:()=>{ GS.def+=5; addGameLog('🏰 Cota de Malla: +5 DEF','log-special'); } },
+    { icon:'❤️', name:'CORAZÓN RÚNICO',  desc:'+20 MAX HP',                 price:60, fn:()=>{ GS.maxHp+=20; GS.hp=Math.min(GS.maxHp,GS.hp+20); addGameLog('❤️ +20 Max HP','log-heal'); } },
+    { icon:'💗', name:'CORAZÓN ETERNO',  desc:'+35 MAX HP',                 price:100,fn:()=>{ GS.maxHp+=35; GS.hp=Math.min(GS.maxHp,GS.hp+35); addGameLog('💗 +35 Max HP','log-heal'); } },
+    { icon:'⚡', name:'CRISTAL ARCANO',  desc:'+1 ENERGÍA MAX',             price:80, fn:()=>{ GS.maxEnergy++; addGameLog('⚡ +1 Energía máxima','log-special'); } },
+    { icon:'📖', name:'TOMO MISTERIOSO', desc:'Añade carta aleatoria',      price:40, fn:()=>{
         const pool=Object.keys(ALL_CARDS);
         const c=pool[Math.floor(Math.random()*pool.length)];
         GS.deck.push(c);
         addGameLog(`📖 Carta añadida: ${ALL_CARDS[c].name}`,'log-loot');
         renderSideDeck();
       }},
+    { icon:'🔥', name:'TOMO DE FUEGO',   desc:'Añade Meteoro al mazo',      price:70, fn:()=>{ GS.deck.push('meteor'); addGameLog('🔥 Meteoro añadido al mazo','log-loot'); renderSideDeck(); } },
+    { icon:'🩸', name:'PACTO OSCURO',    desc:'+6 ATK, -15 MAX HP',         price:35, fn:()=>{ GS.atk+=6; GS.maxHp=Math.max(10,GS.maxHp-15); GS.hp=Math.min(GS.maxHp,GS.hp); addGameLog('🩸 Pacto Oscuro: +6 ATK / -15 MaxHP','log-special'); } },
+    { icon:'🌟', name:'LUZ SAGRADA',     desc:'Cura total + Esc. 15',       price:120,fn:()=>{ healPlayer(GS.maxHp); gainShield(15); addGameLog('🌟 Curación total!','log-heal'); } },
+    { icon:'🎲', name:'DADO DEL CAOS',   desc:'Efecto aleatorio',           price:20, fn:()=>{
+        const effects=[
+          ()=>{ GS.gold+=50; addGameLog('🎲 ¡Suerte! +50 oro','log-loot'); },
+          ()=>{ GS.atk+=3; GS.def+=3; addGameLog('🎲 +3 ATK y DEF','log-special'); },
+          ()=>{ healPlayer(40); addGameLog('🎲 +40 HP','log-heal'); },
+          ()=>{ GS.hp=Math.max(1,GS.hp-20); addGameLog('🎲 Mala suerte: -20 HP','log-dmg'); },
+          ()=>{ GS.deck.push('meteor'); GS.deck.push('meteor'); addGameLog('🎲 x2 Meteoros añadidos','log-loot'); renderSideDeck(); },
+        ];
+        effects[Math.floor(Math.random()*effects.length)]();
+      }},
   ];
   shuffle(items);
-  const shopItems=items.slice(0,4);
+  const shopItems=items.slice(0,5);
   const container=document.getElementById('shop-items');
   container.innerHTML='';
   shopItems.forEach((item,i) => {
@@ -2075,6 +2225,7 @@ function selectClass(cls) {
   GS.level = 1; GS.kills = 0; GS.floor = 1;
   GS.relics = []; GS.buffs = {}; GS.enemyBuffs = {};
   GS.shield = 0; GS.enemyShield = 0;
+  GS.bossDefeated = false;
 
   // Build deck
   GS.deck = [...CLASS_DECKS[cls]];
