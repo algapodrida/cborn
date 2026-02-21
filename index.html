@@ -1115,7 +1115,12 @@ const ALL_CARDS = {
   smoke:      { id:'smoke',   name:'HUMO',        icon:'💨', type:'def', cost:1, effect:'Escudo 3, Roba 1', fn:()=>{ gainShield(3); drawCards(1); } },
   shiv:       { id:'shiv',    name:'NAVAJA',      icon:'🔱', type:'atk', cost:0, effect:'Daño 4',          fn:(e)=>dealDmg(4,e) },
   dagger:     { id:'dagger',  name:'DAGA',        icon:'🗡️', type:'atk', cost:1, effect:'Daño 7',          fn:(e)=>dealDmg(7,e) },
-  shadowstep: { id:'shadowstep',name:'SOMBRA',    icon:'🌑', type:'skill',cost:1, effect:'Esquivar próx atq',fn:()=>addBuff('dodge',1) },
+  // DODGE — guaranteed (cost 3) vs probabilistic (cost 1-2)
+  shadowstep: { id:'shadowstep',name:'PASO SOMBRA', icon:'🌑', type:'skill',cost:3, effect:'ESQUIVE SEGURO próx atq',   fn:()=>addBuff('dodge',1) },
+  phantomVeil:{ id:'phantomVeil',name:'VELO FANTASMA',icon:'👻',type:'skill',cost:3, effect:'ESQUIVE SEGURO ×2 atqs',   fn:()=>addBuff('dodge',2) },
+  quickStep:  { id:'quickStep', name:'PASO RÁPIDO',  icon:'💨', type:'skill',cost:1, effect:'70% esq. próx atq',        fn:()=>addBuff('dodgeChance',70) },
+  sidestep:   { id:'sidestep',  name:'ELUDIR',        icon:'🏃', type:'skill',cost:1, effect:'50% esq. próx atq',        fn:()=>addBuff('dodgeChance',50) },
+  mirrorImage:{ id:'mirrorImage',name:'IMAGEN ESPEJO',icon:'🪞',type:'skill',cost:2, effect:'85% esq. próx 2 atqs',      fn:()=>addBuff('dodgeChance',85) },
 
   // MAGE
   fireball:   { id:'fireball',name:'BOLA FUEGO',  icon:'🔥', type:'atk', cost:2, effect:'Daño 16',          fn:(e)=>dealDmg(16,e) },
@@ -1149,7 +1154,8 @@ const ALL_CARDS = {
   flurry:     { id:'flurry',  name:'RÁFAGA',      icon:'🌪️', type:'atk',  cost:1, effect:'Daño 3×3',         fn:(e)=>{ dealDmg(3,e); dealDmg(3,e); dealDmg(3,e); } },
   caltrop:    { id:'caltrop', name:'TRAMPA',       icon:'🪤', type:'skill',cost:1, effect:'Envenena x5 + Esc.2',fn:(e)=>{ addEnemyBuff('poison',5); gainShield(2); } },
   cheapShot:  { id:'cheapShot',name:'GOLPE BAJO',  icon:'👊', type:'atk',  cost:0, effect:'Daño 6 + Debil.1', fn:(e)=>{ dealDmg(6,e); addEnemyBuff('weak',1); } },
-  evasion:    { id:'evasion', name:'EVASIÓN',      icon:'💃', type:'def',  cost:0, effect:'Esquivar + Esc.2', fn:()=>{ addBuff('dodge',1); gainShield(2); } },
+  evasion:    { id:'evasion', name:'EVASIÓN',       icon:'💃', type:'def',  cost:3, effect:'ESQUIVE SEGURO + Esc.5',   fn:()=>{ addBuff('dodge',1); gainShield(5); } },
+  rollAway:   { id:'rollAway', name:'RODAR',          icon:'🔄', type:'def',  cost:1, effect:'60% esq. + Esc.3',               fn:()=>{ addBuff('dodgeChance',60); gainShield(3); } },
 
   // MAGE EXTRA
   chainLight: { id:'chainLight',name:'RAYO CADENA',icon:'⚡', type:'atk',  cost:2, effect:'Daño 10 + Debil.3',fn:(e)=>{ dealDmg(10,e); addEnemyBuff('weak',3); } },
@@ -1184,11 +1190,11 @@ const ALL_CARDS = {
 
 const CLASS_DECKS = {
   warrior: ['strike','strike','strike','strike','defend','defend','bash','ironWave','heavyBlow','fortify'],
-  rogue:   ['stab','stab','stab','backstab','poison','smoke','shiv','dagger','evasion','cheapShot'],
+  rogue:   ['stab','stab','stab','backstab','poison','smoke','shiv','dagger','evasion','quickStep','sidestep'],
   mage:    ['fireball','frostbolt','arcane','manaShield','arcane','frostbolt','regen','blizzard','chainLight'],
   paladin: ['holyStrike','holyStrike','bulwark','heal','smite','holyStrike','bulwark','penance','divineShield'],
-  necro:   ['soulDrain','soulDrain','shadowBolt','curse','raiseDead','deathCoil','soulDrain','shadowBolt','boneSpear'],
-  shaman:  ['lightning','lightning','earthShield','thunder','spiritWolf','natureBond','lightning','earthShield','stormStrike'],
+  necro:   ['soulDrain','soulDrain','shadowBolt','curse','raiseDead','deathCoil','soulDrain','shadowBolt','boneSpear','quickStep'],
+  shaman:  ['lightning','lightning','earthShield','thunder','spiritWolf','natureBond','lightning','earthShield','stormStrike','rollAway'],
 };
 
 const CLASS_CONFIG = {
@@ -1680,7 +1686,13 @@ function renderCombat() {
   document.getElementById('player-shields').textContent = p.shield>0?`🛡 ×${p.shield}`:'';
 
   // Buffs display
-  const pb = Object.entries(p.buffs).map(([k,v])=>`<span style="color:${k==='poison'?'#88ff00':k==='strength'?'#ff8800':'#00e5ff'}">${k.toUpperCase()} ×${v}</span>`).join(' ');
+  const pb = Object.entries(p.buffs).map(([k,v])=>{
+    if(k==='poison') return `<span style="color:#88ff00">VENENO ×${v}</span>`;
+    if(k==='strength') return `<span style="color:#ff8800">FUERZA ×${v}</span>`;
+    if(k==='dodge') return `<span style="color:#00ffcc">🛡ESQUIVE ×${v}</span>`;
+    if(k==='dodgeChance') return `<span style="color:#aaffee">💨ESQ.${v}%</span>`;
+    return `<span style="color:#00e5ff">${k.toUpperCase()} ×${v}</span>`;
+  }).join(' ');
   document.getElementById('player-buffs').innerHTML = pb;
 
   // Enemy
@@ -1851,6 +1863,31 @@ function tickBuffs() {
   // Tick strength
   if(GS.buffs.strength>0) { GS.buffs.strength--; if(!GS.buffs.strength) delete GS.buffs.strength; }
   if(GS.buffs.dodge>0) { GS.buffs.dodge--; if(!GS.buffs.dodge) delete GS.buffs.dodge; }
+  if(GS.buffs.dodgeChance!==undefined) { delete GS.buffs.dodgeChance; } // Expires each turn
+}
+
+// Returns true if attack was fully dodged
+function checkDodge() {
+  // Guaranteed dodge
+  if(GS.buffs.dodge>0) {
+    GS.buffs.dodge--;
+    if(!GS.buffs.dodge) delete GS.buffs.dodge;
+    addCombatLog('✨ ¡ESQUIVE SEGURO! El ataque no te alcanza.','log-special');
+    return true;
+  }
+  // Probabilistic dodge
+  if(GS.buffs.dodgeChance!==undefined) {
+    const chance = GS.buffs.dodgeChance;
+    delete GS.buffs.dodgeChance;
+    if(Math.random()*100 < chance) {
+      addCombatLog(`💨 ¡Esquivas el ataque! (${chance}% → éxito)`,'log-special');
+      return true;
+    } else {
+      addCombatLog(`😬 Intento de esquive fallido (${chance}% → fallo)`,'log-dmg');
+      return false;
+    }
+  }
+  return false;
 }
 
 function enemyTurn() {
@@ -1862,7 +1899,7 @@ function enemyTurn() {
 
   switch(intent.type) {
     case 'atk': {
-      if(GS.buffs.dodge>0) { addCombatLog('💨 ¡Esquivas el ataque!','log-special'); GS.buffs.dodge--; break; }
+      if(checkDodge()) break;
       let dmg=intent.val;
       if(GS.shield>=dmg) { GS.shield-=dmg; addCombatLog(`🛡 Escudo absorbe ${dmg}`,'log-info'); break; }
       dmg-=GS.shield; GS.shield=0;
@@ -1874,15 +1911,19 @@ function enemyTurn() {
       break;
     }
     case 'atk2': {
-      for(let i=0;i<2;i++) {
-        let dmg=intent.val;
-        if(GS.shield>=dmg) { GS.shield-=dmg; continue; }
-        dmg-=GS.shield; GS.shield=0;
-        dmg=Math.max(0,dmg-GS.def);
-        GS.hp=Math.max(0,GS.hp-dmg);
+      let dodgedAll = checkDodge();
+      if(!dodgedAll) {
+        for(let i=0;i<2;i++) {
+          if(i===1 && checkDodge()) break;
+          let dmg=intent.val;
+          if(GS.shield>=dmg) { GS.shield-=dmg; continue; }
+          dmg-=GS.shield; GS.shield=0;
+          dmg=Math.max(0,dmg-GS.def);
+          GS.hp=Math.max(0,GS.hp-dmg);
+        }
+        addCombatLog(`⚡ Doble ataque recibido`,'log-dmg');
+        flashSprite('player-sprite');
       }
-      addCombatLog(`⚡ Doble ataque: daño total ${intent.val*2-Math.min(GS.shield,intent.val*2)}`,'log-dmg');
-      flashSprite('player-sprite');
       break;
     }
     case 'def':
@@ -1893,10 +1934,12 @@ function enemyTurn() {
       addBuff('poison',intent.val);
       break;
     case 'drain': {
-      let dmg=intent.val;
-      GS.hp=Math.max(0,GS.hp-dmg);
-      e.currentHp=Math.min(e.maxHp,e.currentHp+dmg);
-      addCombatLog(`🩸 Drena ${dmg} vida`,'log-dmg');
+      if(!checkDodge()) {
+        let dmg=intent.val;
+        GS.hp=Math.max(0,GS.hp-dmg);
+        e.currentHp=Math.min(e.maxHp,e.currentHp+dmg);
+        addCombatLog(`🩸 Drena ${dmg} vida`,'log-dmg');
+      }
       break;
     }
   }
@@ -2303,3 +2346,4 @@ loadMetaStats();
 </script>
 </body>
 </html>
+
